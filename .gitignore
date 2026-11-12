@@ -1,0 +1,10 @@
+# Godot: кэш импорта и редактора (создаётся сам)
+game/.godot/
+# Скачанный движок Godot (play.bat / editor.bat)
+.engine/
+# Сборка нативного ядра (CMake/Ninja) и портативный Python
+native/build/
+tools/python/
+# Видео из record_flythrough.bat
+videos/
+*.tmp
