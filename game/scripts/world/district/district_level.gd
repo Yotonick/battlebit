@@ -630,13 +630,35 @@ func _traffic() -> void:
 
 # ================================================================== vegetation
 
-func _tree(x: float, z: float, kind: String) -> void:
+## Trees are copies of a few variants per kind (random yaw hides repeats):
+## faster to build, and the coarse far-away meshes are shared between copies.
+const TREE_VARIANTS := 10
+var _tree_pool := {}  # "kind/variant" -> {vol, lods}
+
+
+func _tree_template(kind: String, seed: int, height: int) -> Dictionary:
+	var key := "%s/%d" % [kind, seed % TREE_VARIANTS]
+	if _tree_pool.has(key):
+		return _tree_pool[key]
 	var v: VoxelVolume
 	match kind:
-		"maple": v = DistrictProps.maple(rng.randi())
-		"linden": v = DistrictProps.linden(rng.randi())
-		"pine": v = Build.pine_tree(rng.randi(), rng.randi_range(75, 100))
-		"bush": v = Build.bush(rng.randi())
+		"maple": v = DistrictProps.maple(seed)
+		"linden": v = DistrictProps.linden(seed)
+		"pine": v = Build.pine_tree(seed, height)
+		"bush": v = Build.bush(seed)
+	var lods := []
+	if kind != "bush":
+		var half := Build.downsample(v, 2)
+		lods = [Build.lod_mesh(half, 2), Build.lod_mesh(Build.downsample(half, 2), 4)]
+	_tree_pool[key] = {"vol": v, "lods": lods}
+	return _tree_pool[key]
+
+
+func _tree(x: float, z: float, kind: String) -> void:
+	var seed := rng.randi()
+	var height := rng.randi_range(75, 100) if kind == "pine" else 0
+	var tpl := _tree_template(kind, seed, height)
+	var v := Build.clone(tpl.vol)
 	var sz := v.get_size()
 	var cs := Vector3i(maxi(sz.x, 32), maxi(sz.y, 32), maxi(sz.z, 32))
 	var o := _place(v, Vector3(x, ground_height(x, z) - 0.1, z), true, rng.randf() * 360.0, "tree", cs)
@@ -646,6 +668,10 @@ func _tree(x: float, z: float, kind: String) -> void:
 			mi.visibility_range_end = 90.0 if kind == "bush" else 175.0
 			if kind == "bush":
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if not (tpl.lods as Array).is_empty():
+		# Full detail up close, 20 cm voxels in the middle, 40 cm far away.
+		var near := 30.0 if GameState.quality <= Quality.LOW else 55.0
+		o.set_lods(tpl.lods, [near, near * 2.2, 175.0])
 
 
 ## Scatters trees inside a zone wherever the occupancy grid is free.

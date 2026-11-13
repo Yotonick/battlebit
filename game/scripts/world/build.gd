@@ -12,6 +12,56 @@ static func vol(size: Vector3i) -> VoxelVolume:
 	return v
 
 
+## Independent copy of a volume (same size, voxels and palette).
+static func clone(v: VoxelVolume) -> VoxelVolume:
+	var c := vol(v.get_size())
+	c.set_data(v.get_data())
+	return c
+
+
+## Coarser copy: each f*f*f block becomes one voxel. A block counts as solid if
+## either of two opposite corners is (keeps thin leaves and trunks visible).
+static func downsample(v: VoxelVolume, f: int) -> VoxelVolume:
+	var s := v.get_size()
+	var n := Vector3i(ceili(s.x / float(f)), ceili(s.y / float(f)), ceili(s.z / float(f)))
+	var src := v.get_data()
+	var dst := PackedByteArray()
+	dst.resize(n.x * n.y * n.z)
+	var sxy := s.x * s.y
+	var h := f - 1
+	var i := 0
+	for z in n.z:
+		var z0 := z * f
+		var z1 := mini(z0 + h, s.z - 1)
+		for y in n.y:
+			var y0 := y * f
+			var y1 := mini(y0 + h, s.y - 1)
+			for x in n.x:
+				var x0 := x * f
+				var x1 := mini(x0 + h, s.x - 1)
+				var a := src[x0 + s.x * y0 + sxy * z0]
+				if a == 0:
+					a = src[x1 + s.x * y1 + sxy * z1]
+				dst[i] = a
+				i += 1
+	var out := vol(n)
+	out.set_data(dst)
+	return out
+
+
+## Render-only mesh of a whole volume drawn with voxels of size VS * f.
+static func lod_mesh(v: VoxelVolume, f: int) -> ArrayMesh:
+	var arrays: Array = v.build_mesh(Vector3i.ZERO, v.get_size(), VS * f)
+	var mesh := ArrayMesh.new()
+	if not (arrays[0] as Array).is_empty():
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays[0])
+		mesh.surface_set_material(mesh.get_surface_count() - 1, VoxMat.opaque_material)
+	if not (arrays[1] as Array).is_empty():
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays[1])
+		mesh.surface_set_material(mesh.get_surface_count() - 1, VoxMat.glass_material)
+	return mesh
+
+
 static func place(parent: Node, v: VoxelVolume, bottom_center: Vector3, static_mode: bool, yaw_deg := 0.0, label := "", csize := Vector3i(32, 32, 32)) -> VoxelObject:
 	var size := Vector3(v.get_size()) * VS
 	var basis := Basis(Vector3.UP, deg_to_rad(yaw_deg))

@@ -25,6 +25,8 @@ var occluder: Node3D
 var spawn_ms := 0
 
 var _chunks := {}           # Vector3i -> Chunk
+var _lods: Array[MeshInstance3D] = []
+var _lod_far_end := 0.0
 var _dirty := {}            # Vector3i -> true
 var _shapes_dirty := false
 var _last_impact_ms := 0
@@ -117,8 +119,36 @@ func rebuild_next() -> bool:
 	return true
 
 
+## Far-away stand-ins: meshes[i] is drawn from ranges[i] to ranges[i + 1],
+## the real chunks only up to ranges[0]. They are dropped on the first change.
+func set_lods(meshes: Array, ranges: Array) -> void:
+	_lod_far_end = ranges[-1]
+	for c: Chunk in _chunks.values():
+		if c.mi:
+			c.mi.visibility_range_end = ranges[0]
+	for i in meshes.size():
+		var mi := MeshInstance3D.new()
+		mi.mesh = meshes[i]
+		mi.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+		mi.visibility_range_begin = ranges[i]
+		mi.visibility_range_end = ranges[i + 1]
+		add_child(mi)
+		_lods.append(mi)
+
+
+func _drop_lods() -> void:
+	for mi in _lods:
+		mi.queue_free()
+	_lods.clear()
+	for c: Chunk in _chunks.values():
+		if c.mi:
+			c.mi.visibility_range_end = _lod_far_end
+
+
 ## mesh_only: colors changed (paint, scorch), collision stays as it is.
 func mark_dirty(vmin: Vector3i, vmax: Vector3i, mesh_only := false) -> void:
+	if not _lods.is_empty():
+		_drop_lods()
 	var a := (vmin - Vector3i.ONE).max(Vector3i.ZERO) / chunk_size
 	var b := ((vmax + Vector3i.ONE) / chunk_size).min(_grid - Vector3i.ONE)
 	for z in range(a.z, b.z + 1):
