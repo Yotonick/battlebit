@@ -4,7 +4,7 @@ extends Node3D
 ## Command line (after --): --bench runs the scripted benchmark, --tour takes
 ## screenshots from fixed viewpoints, --shots=<dir> sets the screenshot folder,
 ## --cinematic=<all|shot> plays the fly-throughs, --quit exits when a scripted
-## run is over, --quality=<0..3>.
+## run is over, --quality=<0..4>.
 ## Team deathmatch (menu or --tdm): --tdm_auto watches ten bots, --tdm_test
 ## takes HUD screenshots, --tdm_limit=<kills> shortens the round.
 
@@ -67,7 +67,7 @@ func _ready() -> void:
 
 	quality = GameState.quality
 	if args.has("quality"):
-		quality = clampi(int(args.quality), 0, 3)
+		quality = clampi(int(args.quality), 0, Quality.COUNT - 1)
 	_apply_quality()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if args.has("no_occlusion"):
@@ -133,7 +133,7 @@ func _setup_tdm() -> void:
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("quality"):
-		quality = (quality + 1) % 4
+		quality = (quality + 1) % Quality.COUNT
 		GameState.quality = quality
 		_apply_quality()
 		hud.message("Качество: " + Quality.NAMES[quality])

@@ -91,7 +91,7 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	camera.fov = 78.0
 	camera.near = 0.03
-	camera.far = 600.0
+	camera.far = Quality.view_distance(GameState.quality)
 	head.add_child(camera)
 	camera.make_current()
 	if tdm:

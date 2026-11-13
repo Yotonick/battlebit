@@ -11,7 +11,7 @@ var _switch_t := 0.0
 
 func _ready() -> void:
 	fov = 70.0
-	far = 600.0
+	far = Quality.view_distance(GameState.quality)
 	make_current()
 
 
